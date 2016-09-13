@@ -86,17 +86,13 @@ global.block = function(fn, parent_) {
 var nginx = module.exports = function(fn) {
   var config = current = _.extend(root, {g:[], parent: null});
   fn(current);
-  return root;
-
-//  _.each(config.g, function(item) {
-//    dispatch(item);
-//  });
-};
-
-nginx.write = function() {
-  _.each(root.g, function(item) {
-    dispatch(item);
-  });
+  return {
+    write: function() {
+      _.each(root.g, function(item) {
+        dispatch(item);
+      });
+    }
+  };
 };
 
 

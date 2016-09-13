@@ -13,7 +13,7 @@ var blueCoat      = ["8.28.16.0/24", "103.246.38.0/24"];
 var theHttp;
 var theItem;
 
-nginx(function() {
+var config = nginx(function() {
   user("scotty");
   workerProcesses(2);
 
@@ -47,7 +47,10 @@ nginx(function() {
   });
 
   deny("199.91.135.0/24", theHttp);
-  deny('10.0.0.0/32', theItem);
   //append(theHttp, "deny", "199.91.135.0/24");
 });
+
+deny('10.0.0.0/32', theItem);
+
+config.write();
 
