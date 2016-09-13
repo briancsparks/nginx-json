@@ -61,6 +61,23 @@ global.server = function(fn, parent_) {
   getConfigFrom(['http'], 'server', parent).push(item);
 };
 
+global.block = function(fn, parent_) {
+  var parent = parent_ || current;
+
+  var level  = depth(parent);
+  var config = config_fn({block:[]}, fn);
+
+  var item = { fn: function() {
+    write();
+//    write(level, "server {");
+    _.each(config.block, function(item) {
+      dispatch(item);
+    });
+//    write(level, "}");
+  }};
+  getConfigFrom([], 'block', parent).push(item);
+};
+
 
 // the nginx global
 module.exports = function(fn) {
