@@ -28,13 +28,12 @@ var config = nginx(function() {
     workerConnections(23);
   });
 
-  theHttp = http(function() {
+  http(function() {
     upload(uploadPath, {maxSize: "25M"});
 
     blankLine();
     include("blockips.conf");
 
-    blankLine();
     blueCoatDenyBlock = block("Go away blue-coat", function() {
     });
 
@@ -45,8 +44,22 @@ var config = nginx(function() {
     server(function() {
       serverName(['foo.example.com', '*.example.com', '']);
       root(rootPath);
+
+      block(function() {
+        listenSsl(443, "/home/scotty/tmp/nginx/partner.example.com");
+      });
+
       theItem = block(function() {
-        listen(80, {ssl: true, default_server: true});
+        listen(80, {default_server: true});
+      });
+
+      block("New locations here", function() {
+        locationRe("^/poll", function() {
+          singleLine(["access_log", "off"]);
+
+          blankLine();
+          proxyPass("pcl_upstream");
+        });
       });
 
       locationRe("/rip", function() {
@@ -58,10 +71,6 @@ var config = nginx(function() {
 
       namedLocation("mario_router_loc", function() {
         proxyPass("pcl_upstream");
-      });
-
-      block(function() {
-        listenSsl(443, "/home/scotty/tmp/nginx/partner.example.com");
       });
 
     });

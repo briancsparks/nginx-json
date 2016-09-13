@@ -141,6 +141,7 @@ global.block = function(/*comment, fn, parent*/) {
   var config = config_fn({block:[]}, fn);
 
   var item = { fn: function() {
+    write();
     if (comment) {
       write(level, "# "+comment);
     }
@@ -172,6 +173,16 @@ var nginx = module.exports = function(fn) {
 // --------------------------------------------------------------------
 //  Simple Items
 // --------------------------------------------------------------------
+
+global.singleLine = function(elts, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
+
+  var item = { fn: function() {
+    writeln(level, elts);
+  }};
+  getConfigFrom([], 'singleLine', parent).push(item);
+};
 
 global.workerConnections = function(count, parent_) {
   var parent = parent_ || current;
@@ -347,6 +358,7 @@ global.listenSsl = function(port, certPrefix, params_, parent_) {
   var default_server  = params.default_server;
 
   var item = { fn: function() {
+    write();
     writeln(level, ["listen", port, "ssl", default_server && 'default']);
     writeln(level, ["ssl_certificate", certPrefix+".chained.crt"]);
     writeln(level, ["ssl_certificate_key", certPrefix+".key"]);
