@@ -174,84 +174,64 @@ var nginx = module.exports = function(fn) {
 //  Simple Items
 // --------------------------------------------------------------------
 
-global.singleLine = function(elts, parent_) {
+var simpleItem = function(myName, validLocNames, parent_, fn) {
   var parent = parent_ || current;
   var level  = depth(parent);
 
   var item = { fn: function() {
+    return fn(level);
+  }};
+  getConfigFrom(validLocNames, myName, parent).push(item);
+
+  return item;
+};
+
+global.singleLine = function(elts, parent) {
+  return simpleItem('single_line', [], parent, function(level) {
     writeln(level, elts);
-  }};
-  getConfigFrom([], 'singleLine', parent).push(item);
+  });
 };
 
-global.workerConnections = function(count, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.workerConnections = function(count, parent) {
+  return simpleItem('worker_connections', ['events'], parent, function(level) {
     writeln(level, ["worker_connections", count]);
-  }};
-  getConfigFrom(['events'], 'workerConnections', parent).push(item);
+  });
 };
 
-global.user = function(name, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.user = function(name, parent) {
+  return simpleItem('user', ['g'], parent, function(level) {
     writeln(level, ["user", name]);
-  }};
-  getConfigFrom(['g'], 'user', parent).push(item);
+  });
 };
 
-global.workerProcesses = function(count, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.workerProcesses = function(count, parent) {
+  return simpleItem('worker_process', ['g'], parent, function(level) {
     writeln(level, ["worker_processes", count]);
-  }};
-  getConfigFrom(['g'], 'worker_processes', parent).push(item);
+  });
 };
 
-global.pid = function(id, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.pid = function(id, parent) {
+  return simpleItem('pid', ['g'], parent, function(level) {
     writeln(level, ["pid", id]);
-  }};
-  getConfigFrom(['g'], 'pid', parent).push(item);
+  });
 };
 
-global.deny = function(name, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.deny = function(name, parent) {
+  return simpleItem('deny', [], parent, function(level) {
     writeln(level, ["deny", name]);
-  }};
-  getConfigFrom([], 'deny', parent).push(item);
+  });
 };
 
-global.include = function(name, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.include = function(name, parent) {
+  return simpleItem('include', [], parent, function(level) {
     writeln(level, ["include", name]);
-  }};
-  getConfigFrom([], 'include', parent).push(item);
+  });
 };
 
-global.root = function(rootPath, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.root = function(rootPath, parent) {
+  return simpleItem('root', [], parent, function(level) {
     writeln(level, ["root", rootPath]);
-  }};
-  getConfigFrom([], 'root', parent).push(item);
+  });
 };
 
 global.tryFiles = function(names, parent_) {
@@ -314,14 +294,10 @@ global.serverName = function(names, parent_) {
   getConfigFrom(['server'], 'server_name', parent).push(item);
 };
 
-global.blankLine = function(parent_) {
-  var parent = parent_ || current;
-  var level  = depth(parent);
-
-  var item = { fn: function() {
+global.blankLine = function(parent) {
+  return simpleItem('blank_line', [], parent, function(level) {
     write();
-  }};
-  getConfigFrom([], 'blankLine', parent).push(item);
+  });
 };
 
 global.append = function(config, parameter /*, args*/) {
@@ -336,72 +312,60 @@ global.append = function(config, parameter /*, args*/) {
 //  Sophisticated Items
 // --------------------------------------------------------------------
 
-global.listen = function(port, params_, parent_) {
+var notSoSimpleItem = function(myName, validLocNames, paramNames, params, parent_, fn) {
   var parent = parent_ || current;
-  var level  = depth(current);
-
-  var params          = params_ || {};
-  var default_server  = params.default_server;
-  var ssl             = params.ssl;
+  var level  = depth(parent);
 
   var item = { fn: function() {
-    writeln(level, ["listen", port, ssl && "ssl", default_server && 'default']);
+    var args = [level];
+    _.each(paramNames, function(name) {
+      args.push(params[name]);
+    });
+    return fn.apply(this, args);
   }};
-  getConfigFrom(['server'], 'listen', parent).push(item);
+  getConfigFrom(validLocNames, myName, parent).push(item);
+
+  return item;
 };
 
-global.listenSsl = function(port, certPrefix, params_, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(current);
+global.listen = function(port, params, parent) {
+  var names = "default_server,ssl".split(',');
+  return notSoSimpleItem('listen', ['server'], names, params, parent, function(level, default_server, ssl) {
+    writeln(level, ["listen", port, ssl && "ssl", default_server && 'default']);
+  });
+};
 
-  var params          = params_ || {};
-  var default_server  = params.default_server;
-
-  var item = { fn: function() {
+global.listenSsl = function(port, certPrefix, params, parent) {
+  var names = "default_server".split(',');
+  return notSoSimpleItem('listen_ssl', ['server'], names, params || {}, parent, function(level, default_server) {
     write();
     writeln(level, ["listen", port, "ssl", default_server && 'default']);
     writeln(level, ["ssl_certificate", certPrefix+".chained.crt"]);
     writeln(level, ["ssl_certificate_key", certPrefix+".key"]);
     writeln(level, ["ssl_protocols", "TLSv1", "TLSv1.1", "TLSv1.2"]);
     writeln(level, ["ssl_ciphers", "HIGH:!aNULL:!MD5"]);
-  }};
-  getConfigFrom(['server'], 'listen', parent).push(item);
+  });
 };
 
-global.errorLog = function(name, params_, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(current);
-
-  var params          = params_ || {};
-  var level           = params.level;
-
-  if (!name) { die("errorLog requires name"); }
-
-  var item = { fn: function() {
-    writeln(level, ["error_log", name, level]);
-  }};
-  getConfigFrom(['g'], 'errorLog', parent).push(item);
+global.errorLog = function(name, params, parent) {
+  var names = "msgLevel".split(',');
+  return notSoSimpleItem('error_log', ['g'], names, params || {}, parent, function(level, msgLevel) {
+    writeln(level, ["error_log", name, msgLevel]);
+  });
 };
 
 // --------------------------------------------------------------------
 //  Compound Items
 // --------------------------------------------------------------------
 
-global.upload = function(uploadPath, params_, parent_) {
-  var parent = parent_ || current;
-  var level  = depth(current);
-
-  var params          = params_ || {};
-  var default_server  = params.default_server;
-  var maxSize         = params.maxSize;
-
-  var item = { fn: function() {
+global.upload = function(uploadPath, params, parent) {
+  var names = "maxSize".split(',');
+  return notSoSimpleItem('upload', ['http', 'server'], names, params || {}, parent, function(level, maxSize) {
     writeln(level, ["client_body_temp_path", uploadPath]);
     if ('maxSize' in params) {
       writeln(level, ["client_max_body_size", maxSize]);
     }
-  }};
-  getConfigFrom(['http', 'server'], 'upload', parent).push(item);
+  });
 };
 
 // server can be the server block, or a server item in upstream

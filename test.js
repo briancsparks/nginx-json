@@ -7,7 +7,8 @@ var fileRoot      = "/home/scotty/tmp/nginx";
 var errorLogFile  = path.join(fileRoot, "log", "error.log");
 var pidFile       = path.join(fileRoot, "nginx.pid");
 var uploadPath    = path.join(fileRoot, "client_body_temp");
-var rootPath      = path.join(fileRoot, "fileroot");
+
+var webroot       = "/var/www";
 
 var blueCoat      = ["8.28.16.0/24", "103.246.38.0/24"];
 
@@ -19,7 +20,7 @@ var config = nginx(function() {
 
   blankLine();
   errorLog(errorLogFile);
-  errorLog(errorLogFile, {level:'notice'});
+  errorLog(errorLogFile, {msgLevel:'notice'});
 
   blankLine();
   pid(pidFile);
@@ -43,7 +44,7 @@ var config = nginx(function() {
 
     server(function() {
       serverName(['foo.example.com', '*.example.com', '']);
-      root(rootPath);
+      root(webroot);
 
       block(function() {
         listenSsl(443, "/home/scotty/tmp/nginx/partner.example.com");
