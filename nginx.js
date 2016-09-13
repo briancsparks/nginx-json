@@ -330,7 +330,7 @@ var notSoSimpleItem = function(myName, validLocNames, paramNames, params, parent
 
 global.listen = function(port, params, parent) {
   var names = "default_server,ssl".split(',');
-  return notSoSimpleItem('listen', ['server'], names, params, parent, function(level, default_server, ssl) {
+  return notSoSimpleItem('listen', ['server'], names, params || {}, parent, function(level, default_server, ssl) {
     writeln(level, ["listen", port, ssl && "ssl", default_server && 'default']);
   });
 };
