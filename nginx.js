@@ -27,7 +27,7 @@ global.http = function(fn) {
 
   var parent = getConfig(['g'], 'http');
   var level  = stack.length;
-  var config = config_fn({http:[]}, fn);
+  var config = config_fn({http:[]}, fn, level);
 
   parent.push(function() {
     write();
@@ -115,13 +115,6 @@ global.deny = function(name, getConfig_) {
   });
 };
 
-global.append = function(name /*, args*/) {
-  if (!name || !global[name]) { die(name+" is not a known config parameter."); }
-
-  var getConfig_ = function() {
-  };
-};
-
 global.include = function(name) {
   var level  = stack.length;
 
@@ -136,6 +129,19 @@ global.blankLine = function() {
   getConfig([], 'blankLine').push(function() {
     write();
   });
+};
+
+global.append = function(config, fnName /*, args*/) {
+  if (!fnName || !global[fnName]) { die(fnName+" is not a known config parameter."); }
+
+  var args = _.rest(arguments, 2);
+
+  // A replacement getConfig function
+  args.push(function(names, ctxName) {
+    return getConfigFrom(names, ctxName, config);
+  });
+
+  return global[fnName].apply(this, args);
 };
 
 // --------------------------------------------------------------------
@@ -232,14 +238,39 @@ function getConfig(names, ctxName) {
     die(ctxName+" is not in right block, should be: "+names.join(', or'));
     return;
   }
-
 }
 
-function config_fn(config, fn) {
+function getConfigFrom(names, ctxName, obj) {
+
+  var config, i, name;
+  for (i = 0; i < names.length; ++i) {
+    name = names[i];
+
+    if ((context = obj[name])) {
+      return context;
+    }
+  }
+
+  // [] for names means any
+  if (names.length === 0 && numKeys(obj) > 0) {
+    return obj[firstKey(obj)];
+  }
+
+  if (!context) {
+    die(ctxName+" is not in right block, should be: "+names.join(', or'));
+    return;
+  }
+}
+
+function config_fn(config, fn, level) {
 
   stack.unshift(config);
   fn();
   stack.shift();
+
+  if (arguments.length >= 3) {
+    _.extend(config, {level: level});
+  }
 
   return config;
 }
