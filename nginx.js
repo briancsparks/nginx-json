@@ -8,54 +8,57 @@ var current;
 //  Blocks
 // --------------------------------------------------------------------
 
-global.events = function(fn) {
+global.events = function(fn, parent_) {
+  var parent = parent_ || current;
 
-  var parent = getConfig(['g'], 'events');
-  var level  = depth(current);
+  var level  = depth(parent);
   var config = config_fn({events:[]}, fn);
 
-  parent.push(function() {
+  var item = { fn: function() {
     write();
     write(level, "events {");
-    _.each(config.events, function(fn) {
-      fn();
+    _.each(config.events, function(item) {
+      dispatch(item);
     });
     write(level, "}");
-  });
+  }};
+  getConfigFrom(['g'], 'events', parent).push(item);
 };
 
-global.http = function(fn) {
+global.http = function(fn, parent_) {
+  var parent = parent_ || current;
 
-  var parent = getConfig(['g'], 'http');
-  var level  = depth(current);
-  var config = config_fn({http:[]}, fn, level);
+  var level  = depth(parent);
+  var config = config_fn({http:[]}, fn);
 
-  parent.push(function() {
+  var item = { fn: function() {
     write();
     write(level, "http {");
-    _.each(config.http, function(fn) {
-      fn();
+    _.each(config.http, function(item) {
+      dispatch(item);
     });
     write(level, "}");
-  });
+  }};
+  getConfigFrom(['g'], 'http', parent).push(item);
 
   return config;
 };
 
-global.server = function(fn) {
+global.server = function(fn, parent_) {
+  var parent = parent_ || current;
 
-  var parent = getConfig(['http'], 'server');
-  var level  = depth(current);
+  var level  = depth(parent);
   var config = config_fn({server:[]}, fn);
 
-  parent.push(function() {
+  var item = { fn: function() {
     write();
     write(level, "server {");
-    _.each(config.server, function(fn) {
-      fn();
+    _.each(config.server, function(item) {
+      dispatch(item);
     });
     write(level, "}");
-  });
+  }};
+  getConfigFrom(['http'], 'server', parent).push(item);
 };
 
 
@@ -64,8 +67,8 @@ module.exports = function(fn) {
   var config = current = _.extend(root, {g:[], parent: null});
   fn(current);
 
-  _.each(config.g, function(fn) {
-    fn();
+  _.each(config.g, function(item) {
+    dispatch(item);
   });
 };
 
@@ -74,61 +77,74 @@ module.exports = function(fn) {
 //  Simple Items
 // --------------------------------------------------------------------
 
-global.workerConnections = function(count) {
-  var level  = depth(current);
+global.workerConnections = function(count, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
 
-  getConfig(['events'], 'workerConnections').push(function() {
+  var item = { fn: function() {
     writeln(level, ["worker_connections", count]);
-  });
+  }};
+  getConfigFrom(['events'], 'workerConnections', parent).push(item);
 };
 
-global.user = function(name) {
-  var level  = depth(current);
+global.user = function(name, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
 
-  getConfig(['g'], 'user').push(function() {
+  var item = { fn: function() {
     writeln(level, ["user", name]);
-  });
+  }};
+  getConfigFrom(['g'], 'user', parent).push(item);
 };
 
-global.workerProcesses = function(count) {
-  var level  = depth(current);
+global.workerProcesses = function(count, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
 
-  getConfig(['g'], 'worker_processes').push(function() {
+  var item = { fn: function() {
     writeln(level, ["worker_processes", count]);
-  });
+  }};
+  getConfigFrom(['g'], 'worker_processes', parent).push(item);
 };
 
-global.pid = function(id) {
-  var level  = depth(current);
+global.pid = function(id, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
 
-  getConfig(['g'], 'pid').push(function() {
+  var item = { fn: function() {
     writeln(level, ["pid", id]);
-  });
+  }};
+  getConfigFrom(['g'], 'pid', parent).push(item);
 };
 
-global.deny = function(name, getConfig_) {
-  var ggetConfig  = getConfig_ || getConfig;
-  var level       = depth(current);
+global.deny = function(name, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
 
-  ggetConfig([], 'deny').push(function() {
+  var item = { fn: function() {
     writeln(level, ["deny", name]);
-  });
+  }};
+  getConfigFrom([], 'deny', parent).push(item);
 };
 
-global.include = function(name) {
-  var level  = depth(current);
+global.include = function(name, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
 
-  getConfig([], 'include').push(function() {
+  var item = { fn: function() {
     writeln(level, ["include", name]);
-  });
+  }};
+  getConfigFrom([], 'include', parent).push(item);
 };
 
-global.blankLine = function() {
-  var level  = depth(current);
+global.blankLine = function(parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
 
-  getConfig([], 'blankLine').push(function() {
+  var item = { fn: function() {
     write();
-  });
+  }};
+  getConfigFrom([], 'blankLine', parent).push(item);
 };
 
 global.append = function(config, fnName /*, args*/) {
@@ -148,21 +164,22 @@ global.append = function(config, fnName /*, args*/) {
 //  Sophisticated Items
 // --------------------------------------------------------------------
 
-global.listen = function(port, params_) {
-  var parent = getConfig(['server'], 'listen');
+global.listen = function(port, params_, parent_) {
+  var parent = parent_ || current;
   var level  = depth(current);
 
   var params          = params_ || {};
   var default_server  = params.default_server;
   var ssl             = params.ssl;
 
-  parent.push(function() {
+  var item = { fn: function() {
     writeln(level, ["listen", port, ssl && "ssl", default_server && 'default']);
-  });
+  }};
+  getConfigFrom(['server'], 'listen', parent).push(item);
 };
 
-global.errorLog = function(name, params_) {
-  var parent = getConfig(['g'], 'errorLog');
+global.errorLog = function(name, params_, parent_) {
+  var parent = parent_ || current;
   var level  = depth(current);
 
   var params          = params_ || {};
@@ -170,29 +187,31 @@ global.errorLog = function(name, params_) {
 
   if (!name) { die("errorLog requires name"); }
 
-  parent.push(function() {
+  var item = { fn: function() {
     writeln(level, ["error_log", name, level]);
-  });
+  }};
+  getConfigFrom(['g'], 'errorLog', parent).push(item);
 };
 
 // --------------------------------------------------------------------
 //  Compound Items
 // --------------------------------------------------------------------
 
-global.upload = function(uploadPath, params_) {
-  var parent = getConfig(['http', 'server'], 'upload');
+global.upload = function(uploadPath, params_, parent_) {
+  var parent = parent_ || current;
   var level  = depth(current);
 
   var params          = params_ || {};
   var default_server  = params.default_server;
   var maxSize         = params.maxSize;
 
-  parent.push(function() {
+  var item = { fn: function() {
     writeln(level, ["client_body_temp_path", uploadPath]);
     if ('maxSize' in params) {
       writeln(level, ["client_max_body_size", maxSize]);
     }
-  });
+  }};
+  getConfigFrom(['http', 'server'], 'upload', parent).push(item);
 };
 
 
@@ -216,11 +235,8 @@ function numKeys(o) {
   return _.keys(o).length;
 }
 
-function getConfig(names, ctxName) {
-  return getConfigFrom(names, ctxName, current);
-}
-
-function getConfigFrom(names, ctxName, obj) {
+function getConfigFrom(names, ctxName, obj_) {
+  var obj = obj_ || current;
 
   var config, i, name;
   for (i = 0; i < names.length; ++i) {
@@ -255,7 +271,7 @@ function depth(obj) {
   return theDepth;
 }
 
-function config_fn(config, fn, level) {
+function config_fn(config, fn) {
 
   config.parent = current;
 
@@ -263,11 +279,17 @@ function config_fn(config, fn, level) {
   fn(config);
   current = current.parent;
 
-  if (arguments.length >= 3) {
-    _.extend(config, {level: level});
+  return config;
+}
+
+function dispatch(item) {
+  var fn = item;
+  if (_.isFunction(fn)) {
+    return fn();
   }
 
-  return config;
+  /* otherwise */
+  return dispatch(item.fn);
 }
 
 function writeln(a, b) {
