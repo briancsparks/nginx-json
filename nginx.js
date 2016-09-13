@@ -170,17 +170,12 @@ global.blankLine = function(parent_) {
   getConfigFrom([], 'blankLine', parent).push(item);
 };
 
-global.append = function(config, fnName /*, args*/) {
-  if (!fnName || !global[fnName]) { die(fnName+" is not a known config parameter."); }
+global.append = function(config, parameter /*, args*/) {
 
   var args = _.rest(arguments, 2);
 
-  // A replacement getConfig function
-  args.push(function(names, ctxName) {
-    return getConfigFrom(names, ctxName, config);
-  });
-
-  return global[fnName].apply(this, args);
+  args.push(config);
+  return parameter.apply(this, args);
 };
 
 // --------------------------------------------------------------------
