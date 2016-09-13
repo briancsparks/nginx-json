@@ -65,13 +65,20 @@ global.server = function(fn, parent_) {
   return config;
 };
 
-global.block = function(fn, parent_) {
-  var parent = parent_ || current;
+global.block = function(/*comment, fn, parent*/) {
+  var args      = _.toArray(arguments);
+  var comment   = _.isString(args[0]) ? args.shift() : null;
+  var fn        = _.isFunction(args[0]) ? args.shift() : function(){};
+  var parent    = args.length > 0 ? args.shift() : current;
 
   var level  = depth(parent);
   var config = config_fn({block:[]}, fn);
 
   var item = { fn: function() {
+    if (comment) {
+      write(level, "# "+comment);
+    }
+
     _.each(config.block, function(item) {
       dispatch(item);
     });

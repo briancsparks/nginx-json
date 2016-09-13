@@ -34,7 +34,7 @@ var config = nginx(function() {
     include("blockips.conf");
 
     blankLine();
-    blueCoatDenyBlock = block(function() {
+    blueCoatDenyBlock = block("Go away blue-coat", function() {
     });
 
     server(function() {
