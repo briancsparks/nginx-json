@@ -2,6 +2,8 @@
 var _       = require('underscore');
 
 var stack       = [];
+var root        = {};
+var current;
 
 // --------------------------------------------------------------------
 //  Blocks
@@ -10,7 +12,7 @@ var stack       = [];
 global.events = function(fn) {
 
   var parent = getConfig(['g'], 'events');
-  var level  = stack.length;
+  var level  = depth(current);
   var config = config_fn({events:[]}, fn);
 
   parent.push(function() {
@@ -26,7 +28,7 @@ global.events = function(fn) {
 global.http = function(fn) {
 
   var parent = getConfig(['g'], 'http');
-  var level  = stack.length;
+  var level  = depth(current);
   var config = config_fn({http:[]}, fn, level);
 
   parent.push(function() {
@@ -44,7 +46,7 @@ global.http = function(fn) {
 global.server = function(fn) {
 
   var parent = getConfig(['http'], 'server');
-  var level  = stack.length;
+  var level  = depth(current);
   var config = config_fn({server:[]}, fn);
 
   parent.push(function() {
@@ -60,9 +62,9 @@ global.server = function(fn) {
 
 // the nginx global
 module.exports = function(fn) {
-  var config = {g:[]};
+  var config = current = _.extend(root, {g:[], parent: null});
   stack.unshift(config);
-  fn();
+  fn(current);
 
   _.each(config.g, function(fn) {
     fn();
@@ -75,7 +77,7 @@ module.exports = function(fn) {
 // --------------------------------------------------------------------
 
 global.workerConnections = function(count) {
-  var level  = stack.length;
+  var level  = depth(current);
 
   getConfig(['events'], 'workerConnections').push(function() {
     writeln(level, ["worker_connections", count]);
@@ -83,7 +85,7 @@ global.workerConnections = function(count) {
 };
 
 global.user = function(name) {
-  var level  = stack.length;
+  var level  = depth(current);
 
   getConfig(['g'], 'user').push(function() {
     writeln(level, ["user", name]);
@@ -91,7 +93,7 @@ global.user = function(name) {
 };
 
 global.workerProcesses = function(count) {
-  var level  = stack.length;
+  var level  = depth(current);
 
   getConfig(['g'], 'worker_processes').push(function() {
     writeln(level, ["worker_processes", count]);
@@ -99,7 +101,7 @@ global.workerProcesses = function(count) {
 };
 
 global.pid = function(id) {
-  var level  = stack.length;
+  var level  = depth(current);
 
   getConfig(['g'], 'pid').push(function() {
     writeln(level, ["pid", id]);
@@ -108,7 +110,7 @@ global.pid = function(id) {
 
 global.deny = function(name, getConfig_) {
   var ggetConfig  = getConfig_ || getConfig;
-  var level       = stack.length;
+  var level       = depth(current);
 
   ggetConfig([], 'deny').push(function() {
     writeln(level, ["deny", name]);
@@ -116,7 +118,7 @@ global.deny = function(name, getConfig_) {
 };
 
 global.include = function(name) {
-  var level  = stack.length;
+  var level  = depth(current);
 
   getConfig([], 'include').push(function() {
     writeln(level, ["include", name]);
@@ -124,7 +126,7 @@ global.include = function(name) {
 };
 
 global.blankLine = function() {
-  var level  = stack.length;
+  var level  = depth(current);
 
   getConfig([], 'blankLine').push(function() {
     write();
@@ -150,7 +152,7 @@ global.append = function(config, fnName /*, args*/) {
 
 global.listen = function(port, params_) {
   var parent = getConfig(['server'], 'listen');
-  var level  = stack.length;
+  var level  = depth(current);
 
   var params          = params_ || {};
   var default_server  = params.default_server;
@@ -163,7 +165,7 @@ global.listen = function(port, params_) {
 
 global.errorLog = function(name, params_) {
   var parent = getConfig(['g'], 'errorLog');
-  var level  = stack.length;
+  var level  = depth(current);
 
   var params          = params_ || {};
   var level           = params.level;
@@ -181,7 +183,7 @@ global.errorLog = function(name, params_) {
 
 global.upload = function(uploadPath, params_) {
   var parent = getConfig(['http', 'server'], 'upload');
-  var level  = stack.length;
+  var level  = depth(current);
 
   var params          = params_ || {};
   var default_server  = params.default_server;
@@ -217,6 +219,8 @@ function numKeys(o) {
 }
 
 function getConfig(names, ctxName) {
+  return getConfigFrom(names, ctxName, current);
+
   var stackTop = stack[0];
   if (!stackTop) { die("No context for "+ctxName); }
 
@@ -235,6 +239,7 @@ function getConfig(names, ctxName) {
   }
 
   if (!context) {
+    console.error("current:", current);
     die(ctxName+" is not in right block, should be: "+names.join(', or'));
     return;
   }
@@ -257,16 +262,34 @@ function getConfigFrom(names, ctxName, obj) {
   }
 
   if (!context) {
+    console.error("current:", current);
     die(ctxName+" is not in right block, should be: "+names.join(', or'));
     return;
   }
 }
 
+function depth(obj) {
+  var curr      = obj;
+  var theDepth  = 1;
+
+  while (curr.parent !== null) {
+    curr = curr.parent;
+    theDepth++;
+  }
+
+  return theDepth;
+}
+
 function config_fn(config, fn, level) {
 
+  config.parent = current;
+  current       = config;
+
   stack.unshift(config);
-  fn();
+  fn(config);
   stack.shift();
+
+  current = current.parent;
 
   if (arguments.length >= 3) {
     _.extend(config, {level: level});
