@@ -339,6 +339,23 @@ global.listen = function(port, params_, parent_) {
   getConfigFrom(['server'], 'listen', parent).push(item);
 };
 
+global.listenSsl = function(port, certPrefix, params_, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(current);
+
+  var params          = params_ || {};
+  var default_server  = params.default_server;
+
+  var item = { fn: function() {
+    writeln(level, ["listen", port, "ssl", default_server && 'default']);
+    writeln(level, ["ssl_certificate", certPrefix+".chained.crt"]);
+    writeln(level, ["ssl_certificate_key", certPrefix+".key"]);
+    writeln(level, ["ssl_protocols", "TLSv1", "TLSv1.1", "TLSv1.2"]);
+    writeln(level, ["ssl_ciphers", "HIGH:!aNULL:!MD5"]);
+  }};
+  getConfigFrom(['server'], 'listen', parent).push(item);
+};
+
 global.errorLog = function(name, params_, parent_) {
   var parent = parent_ || current;
   var level  = depth(current);

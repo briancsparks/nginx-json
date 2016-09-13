@@ -60,6 +60,10 @@ var config = nginx(function() {
         proxyPass("pcl_upstream");
       });
 
+      block(function() {
+        listenSsl(443, "/home/scotty/tmp/nginx/partner.example.com");
+      });
+
     });
   });
 });
