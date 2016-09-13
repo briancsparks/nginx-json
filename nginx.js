@@ -65,6 +65,72 @@ global.server = function(fn, parent_) {
   return config;
 };
 
+global.location = function(path, options_, fn, parent_) {
+  var parent  = parent_   || current;
+  var options = options_  || {};
+  var reStr   = "";
+
+  if (options.re)            { reStr = '~'; }     // Regular expression
+  else if (options.rei)      { reStr = '~*'; }    // Case-insensitive regular expression
+  else if (options.trumpRe)  { reStr = '^~'; }    // Trumps re-matched locations
+  else if (options.exact)    { reStr = '='; }     // Exact path match
+
+  var level  = depth(parent);
+  var config = config_fn({location:[]}, fn);
+
+  var locationLine = _.compact(['location', reStr, path]).join(' ');
+  var item = { fn: function() {
+    write();
+    write(level, locationLine+" {");
+    _.each(config.location, function(item) {
+      dispatch(item);
+    });
+    write(level, "}");
+  }};
+  getConfigFrom(['server'], 'location', parent).push(item);
+
+  return config;
+};
+
+global.locationRe = function(path, fn, parent_) {
+  return global.location(path, {re:true}, fn, parent_);
+};
+
+global.locationRei = function(path, fn, parent_) {
+  return global.location(path, {rei:true}, fn, parent_);
+};
+
+global.locationExact = function(path, fn, parent_) {
+  return global.location(path, {exact:true}, fn, parent_);
+};
+
+global.locationTrumpRe = function(path, fn, parent_) {
+  return global.location(path, {trumpRe:true}, fn, parent_);
+};
+
+global.namedLocation = function(path, fn, parent_) {
+  return global.location("@"+path, {}, fn, parent_);
+};
+
+global.upstream = function(name, fn, parent_) {
+  var parent = parent_ || current;
+
+  var level  = depth(parent);
+  var config = config_fn({upstream:[]}, fn);
+
+  var item = { fn: function() {
+    write();
+    write(level, "upstream "+name+" {");
+    _.each(config.upstream, function(item) {
+      dispatch(item);
+    });
+    write(level, "}");
+  }};
+  getConfigFrom(['http'], 'upstream', parent).push(item);
+
+  return config;
+};
+
 global.block = function(/*comment, fn, parent*/) {
   var args      = _.toArray(arguments);
   var comment   = _.isString(args[0]) ? args.shift() : null;
@@ -167,6 +233,76 @@ global.include = function(name, parent_) {
   getConfigFrom([], 'include', parent).push(item);
 };
 
+global.root = function(rootPath, parent_) {
+  var parent = parent_ || current;
+  var level  = depth(parent);
+
+  var item = { fn: function() {
+    writeln(level, ["root", rootPath]);
+  }};
+  getConfigFrom([], 'root', parent).push(item);
+};
+
+global.tryFiles = function(names, parent_) {
+  if (!_.isArray(names)) { return global.tryFiles([names], parent_); }
+
+  var parent = parent_ || current;
+  var level  = depth(parent);
+
+  var writeArgs = _.toArray(names);
+  writeArgs.unshift("try_files");
+
+  var item = { fn: function() {
+    writeln(level, writeArgs);
+  }};
+  getConfigFrom(['server'], 'server_name', parent).push(item);
+};
+
+global.proxyPass = function(name /*, options, parent*/) {
+  var args    = _.rest(arguments);
+  var parent  = args.length > 1 ? args.pop() : current;
+  var options = args.pop() || {};
+
+  var level  = depth(parent);
+
+  var item = { fn: function() {
+    if (options.longHeld) {
+      writeln(level, ["proxy_connect_timeout", 5000]);
+      writeln(level, ["proxy_send_timeout", 5000]);
+      writeln(level, ["proxy_read_timeout", 5000]);
+      writeln(level, ["send_timeout", 5000]);
+    }
+
+    writeln(level, ["proxy_redirect", "off"]);
+    writeln(level, ["proxy_set_header", "X-Real-IP", "$remote_addr"]);
+    writeln(level, ["proxy_set_header", "X-Forwarded-For", "$proxy_add_x_forwarded_for"]);
+    writeln(level, ["proxy_set_header", "X-Forwarded-Proto", "$scheme"]);
+    writeln(level, ["proxy_set_header", "Host", "$http_host"]);
+    writeln(level, ["proxy_set_header", "X-NginX-Proxy", true]);
+    writeln(level, ["proxy_set_header", "Connection", ""]);
+    writeln(level, ["proxy_http_version", "1.1"]);
+    writeln(level, ["proxy_pass", "http://"+name]);
+  }};
+  getConfigFrom([], 'proxy_pass', parent).push(item);
+};
+
+global.serverName = function(names, parent_) {
+  if (!_.isArray(names)) { return global.serverName([names], parent_); }
+
+  var parent = parent_ || current;
+  var level  = depth(parent);
+
+  // TODO: must be able to use an empty string ""
+  var writeArgs = _.toArray(names);
+
+  writeArgs.unshift("server_name");
+
+  var item = { fn: function() {
+    writeln(level, writeArgs);
+  }};
+  getConfigFrom(['server'], 'server_name', parent).push(item);
+};
+
 global.blankLine = function(parent_) {
   var parent = parent_ || current;
   var level  = depth(parent);
@@ -239,6 +375,30 @@ global.upload = function(uploadPath, params_, parent_) {
   getConfigFrom(['http', 'server'], 'upload', parent).push(item);
 };
 
+// server can be the server block, or a server item in upstream
+var serverBlock = global.server;
+global.server = function(address, params_, parent_) {
+  var parent = parent_ || current;
+
+  if (!getConfigFrom(['upstream'], 'server', parent, {noDie:true})) {
+    return serverBlock.apply(this, arguments);
+  }
+
+  /* otherwise -- must be a simple server, not the block */
+  var level  = depth(parent);
+
+  var params          = params_ || {};
+  var weight          = params.weight;
+  var maxFails        = params.maxFails;
+  var failTimeout     = params.failTimeout;
+  var backup          = params.backup;
+  var down            = params.down;
+
+  var item = { fn: function() {
+    writeln(level, ["server", address, weight && "weight="+weight, maxFails && "max_fails="+maxFails, failTimeout && "fail_timeout="+failTimeout, backup && 'backup', down && 'down']);
+  }};
+  getConfigFrom([], 'deny', parent).push(item);
+};
 
 
 
@@ -260,8 +420,9 @@ function numKeys(o) {
   return _.keys(o).length;
 }
 
-function getConfigFrom(names, ctxName, obj_) {
-  var obj = obj_ || current;
+function getConfigFrom(names, ctxName, obj_, options_) {
+  var obj     = obj_      || current;
+  var options = options_  || {};
 
   var config, i, name;
   for (i = 0; i < names.length; ++i) {
@@ -280,6 +441,11 @@ function getConfigFrom(names, ctxName, obj_) {
   /* otherwise */
   if ('block' in obj) {
     return getConfigFrom(names, ctxName, obj_.parent);
+  }
+
+  /* otherwise -- not found */
+  if (options.noDie) {
+    return /*undefined*/;
   }
 
   if (!context) {
