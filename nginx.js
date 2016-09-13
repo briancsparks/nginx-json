@@ -23,6 +23,8 @@ global.events = function(fn, parent_) {
     write(level, "}");
   }};
   getConfigFrom(['g'], 'events', parent).push(item);
+
+  return config;
 };
 
 global.http = function(fn, parent_) {
@@ -59,6 +61,8 @@ global.server = function(fn, parent_) {
     write(level, "}");
   }};
   getConfigFrom(['http'], 'server', parent).push(item);
+
+  return config;
 };
 
 global.block = function(fn, parent_) {
@@ -68,14 +72,13 @@ global.block = function(fn, parent_) {
   var config = config_fn({block:[]}, fn);
 
   var item = { fn: function() {
-    write();
-//    write(level, "server {");
     _.each(config.block, function(item) {
       dispatch(item);
     });
-//    write(level, "}");
   }};
   getConfigFrom([], 'block', parent).push(item);
+
+  return config;
 };
 
 
@@ -269,6 +272,11 @@ function getConfigFrom(names, ctxName, obj_) {
     return obj[firstKey(obj)];
   }
 
+  /* otherwise */
+  if ('block' in obj) {
+    return getConfigFrom(names, ctxName, obj_.parent);
+  }
+
   if (!context) {
     console.error("current:", current);
     die(ctxName+" is not in right block, should be: "+names.join(', or'));
@@ -281,8 +289,10 @@ function depth(obj) {
   var theDepth  = 1;
 
   while (curr.parent !== null) {
+    if (!('block' in curr)) {
+      theDepth++;
+    }
     curr = curr.parent;
-    theDepth++;
   }
 
   return theDepth;

@@ -11,6 +11,7 @@ var uploadPath    = path.join(fileRoot, "client_body_temp");
 var blueCoat      = ["8.28.16.0/24", "103.246.38.0/24"];
 
 var theHttp;
+var theItem;
 
 nginx(function() {
   user("scotty");
@@ -39,11 +40,14 @@ nginx(function() {
     include("blockips.conf");
 
     server(function() {
-      listen(80, {ssl: true, default_server: true});
+      theItem = block(function() {
+        listen(80, {ssl: true, default_server: true});
+      });
     });
   });
 
   deny("199.91.135.0/24", theHttp);
+  deny('10.0.0.0/32', theItem);
   //append(theHttp, "deny", "199.91.135.0/24");
 });
 
