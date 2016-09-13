@@ -1,7 +1,6 @@
 
 var _       = require('underscore');
 
-var stack       = [];
 var root        = {};
 var current;
 
@@ -63,7 +62,6 @@ global.server = function(fn) {
 // the nginx global
 module.exports = function(fn) {
   var config = current = _.extend(root, {g:[], parent: null});
-  stack.unshift(config);
   fn(current);
 
   _.each(config.g, function(fn) {
@@ -220,29 +218,6 @@ function numKeys(o) {
 
 function getConfig(names, ctxName) {
   return getConfigFrom(names, ctxName, current);
-
-  var stackTop = stack[0];
-  if (!stackTop) { die("No context for "+ctxName); }
-
-  var config, i, name;
-  for (i = 0; i < names.length; ++i) {
-    name = names[i];
-
-    if ((context = stackTop[name])) {
-      return context;
-    }
-  }
-
-  // [] for names means any
-  if (names.length === 0 && numKeys(stackTop) > 0) {
-    return stackTop[firstKey(stackTop)];
-  }
-
-  if (!context) {
-    console.error("current:", current);
-    die(ctxName+" is not in right block, should be: "+names.join(', or'));
-    return;
-  }
 }
 
 function getConfigFrom(names, ctxName, obj) {
@@ -283,12 +258,9 @@ function depth(obj) {
 function config_fn(config, fn, level) {
 
   config.parent = current;
+
   current       = config;
-
-  stack.unshift(config);
   fn(config);
-  stack.shift();
-
   current = current.parent;
 
   if (arguments.length >= 3) {
