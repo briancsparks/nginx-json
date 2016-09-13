@@ -106,12 +106,20 @@ global.pid = function(id) {
   });
 };
 
-global.deny = function(name) {
-  var level  = stack.length;
+global.deny = function(name, getConfig_) {
+  var ggetConfig  = getConfig_ || getConfig;
+  var level       = stack.length;
 
-  getConfig([], 'deny').push(function() {
+  ggetConfig([], 'deny').push(function() {
     writeln(level, ["deny", name]);
   });
+};
+
+global.append = function(name /*, args*/) {
+  if (!name || !global[name]) { die(name+" is not a known config parameter."); }
+
+  var getConfig_ = function() {
+  };
 };
 
 global.include = function(name) {
