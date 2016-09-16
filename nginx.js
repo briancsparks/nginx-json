@@ -162,6 +162,7 @@ var nginx = module.exports = function(fn) {
   fn(current);
   return {
     write: function() {
+      write(0, ['# vim: filetype=nginx:']);
       _.each(root.g, function(item) {
         dispatch(item);
       });
@@ -276,7 +277,7 @@ global.proxyMaxTempFileSize = function(size, parent) {
   });
 };
 
-global.set = function(varName, value, parent) {
+global.set_ = function(varName, value, parent) {
   return simpleItem('set', [], parent, function(level) {
     writeln(level, ["set", varName, '"'+value+'"']);
   });
@@ -591,12 +592,19 @@ function writeln(a, b) {
  *  Does not eliminate zeros.
  */
 function _compact(arr) {
-  return _.filter(arr, function(item) {
-    if (item === 0) { return true; }
-    if (item)       { return true; }
+  //return _.filter(_.map(arr, function(item) {
+  var result = _.filter(_.map(arr, function(item) {
+    if (item === '')  { return '""'; }
+    return item;
+  }), function(item) {
+    if (item === 0)   { return true; }
+    if (item === '')  { return true; }
+    if (item)         { return true; }
 
     return false;
   });
+
+  return result;
 }
 
 function write(a, b) {
