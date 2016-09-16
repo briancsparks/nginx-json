@@ -54,27 +54,61 @@ var config = nginx(function() {
         listen(80, {default_server: true});
       });
 
+      internalRedirLocation("^/secret_internal_rev_proxy/(.*)", function() {
+        blankLine();
+        set("$download_uri", "$1");
+
+        blankLine();
+        proxyPass("http://127.0.0.1/$download_uri");
+
+      });
+
+      internalRedirLocation("^/secret_internal_balanceto/(.*)/(.*)", function() {
+        blankLine();
+        set("$download_host", "$1");
+        set("$download_path", "$2");
+
+        blankLine();
+        proxyPass("http://$download_host/$download_path");
+
+      });
+
+      internalRedirLocation("^/secret_external_rev_proxy/(.*?)/(.*)", function() {
+        blankLine();
+        set("$download_host", "$1");
+        set("$download_uri", "$2");
+        set("$download_url", "http://$download_host/$download_uri");
+
+        blankLine();
+        proxySetHeader("Host", "$download_host");
+
+        blankLine();
+        proxyPass("http://$download_url");
+
+      });
+
       block("New locations here", function() {
         locationRe("^/poll", function() {
           singleLine(["access_log", "off"]);
 
           blankLine();
-          proxyPass("pcl_upstream");
+          proxyPassEx("pcl_upstream");
         });
       });
 
       locationRe("/rip", function() {
-        proxyPass("pcl_upstream", {longHeld:true});
+        proxyPassEx("pcl_upstream", {longHeld:true});
       });
 
       blankLine();
       tryFiles(["maintenance.html", "@mario_router_loc"]);
 
       namedLocation("mario_router_loc", function() {
-        proxyPass("pcl_upstream");
+        proxyPassEx("pcl_upstream");
       });
 
     });
+
   });
 });
 

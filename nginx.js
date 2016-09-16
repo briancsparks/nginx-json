@@ -222,6 +222,18 @@ global.deny = function(name, parent) {
   });
 };
 
+global.allow = function(name, parent) {
+  return simpleItem('allow', [], parent, function(level) {
+    writeln(level, ["allow", name]);
+  });
+};
+
+global.internal = function(parent) {
+  return simpleItem('internal', ['location'], parent, function(level) {
+    writeln(level, ["internal"]);
+  });
+};
+
 global.include = function(name, parent) {
   return simpleItem('include', [], parent, function(level) {
     writeln(level, ["include", name]);
@@ -233,6 +245,73 @@ global.root = function(rootPath, parent) {
     writeln(level, ["root", rootPath]);
   });
 };
+
+global.proxyBuffering = function(onOrOff, parent) {
+  return simpleItem('proxy_buffering', ['location'], parent, function(level) {
+    writeln(level, ["proxy_buffering", onOrOff]);
+  });
+};
+
+global.proxySetHeader = function(headerName, value, parent) {
+  return simpleItem('proxy_set_header', ['location'], parent, function(level) {
+    writeln(level, ["proxy_set_header", headerName, '"'+value+'"']);
+  });
+};
+
+global.proxyMethod = function(name, parent) {
+  return simpleItem('proxy_method', ['location'], parent, function(level) {
+    writeln(level, ["proxy_method", name]);
+  });
+};
+
+global.proxyPassRequestBody = function(onOrOff, parent) {
+  return simpleItem('proxy_pass_request_body', ['location'], parent, function(level) {
+    writeln(level, ["proxy_pass_request_body", onOrOff]);
+  });
+};
+
+global.proxyMaxTempFileSize = function(size, parent) {
+  return simpleItem('proxy_max_temp_file_size', ['location'], parent, function(level) {
+    writeln(level, ["proxy_max_temp_file_size", +size]);
+  });
+};
+
+global.set = function(varName, value, parent) {
+  return simpleItem('set', [], parent, function(level) {
+    writeln(level, ["set", varName, '"'+value+'"']);
+  });
+};
+
+global.proxyPass = function(url, parent) {
+  return simpleItem('proxy_pass', ['location'], parent, function(level) {
+    writeln(level, ["proxy_pass", url]);
+  });
+};
+
+global.internalRedirLocation = function(path, fn, parent_) {
+
+  locationRei(path, function() {
+    internal();
+
+    blankLine();
+    proxyBuffering("off");
+    proxySetHeader("Content-Length", "");
+    proxySetHeader("Cookie", "");
+
+    blankLine();
+    proxyMethod("GET");
+    proxyPassRequestBody("off");
+    proxyMaxTempFileSize(0);
+
+    fn();
+  }, parent_ || current);
+
+};
+
+
+
+
+
 
 global.tryFiles = function(names, parent_) {
   if (!_.isArray(names)) { return global.tryFiles([names], parent_); }
@@ -249,7 +328,7 @@ global.tryFiles = function(names, parent_) {
   getConfigFrom(['server'], 'server_name', parent).push(item);
 };
 
-global.proxyPass = function(name /*, options, parent*/) {
+global.proxyPassEx = function(name /*, options, parent*/) {
   var args    = _.rest(arguments);
   var parent  = args.length > 1 ? args.pop() : current;
   var options = args.pop() || {};
@@ -502,10 +581,22 @@ function writeln(a, b) {
   }
 
   if (_.isArray(x)) {
-    writeOne(_.compact(x).join(' '));
+    writeOne(_compact(x).join(' '));
   } else {
     writeOne(x);
   }
+}
+
+/**
+ *  Does not eliminate zeros.
+ */
+function _compact(arr) {
+  return _.filter(arr, function(item) {
+    if (item === 0) { return true; }
+    if (item)       { return true; }
+
+    return false;
+  });
 }
 
 function write(a, b) {
