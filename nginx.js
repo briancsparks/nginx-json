@@ -1,8 +1,27 @@
 
-var _       = require('underscore');
+var _           = require('underscore');
+var fs          = require('fs');
+var path        = require('path');
+var spawnSync   = require('child_process').spawnSync;
+var util        = require('util');
+
+require('shelljs/global');
+
+var format      = util.format;
+
+var prefix      = '/etc/nginx/';
 
 var root        = {};
 var current;
+var outputLines = [];   // the write() function pushes all written lines to this array
+
+// --------------------------------------------------------------------
+//  Utilities
+// --------------------------------------------------------------------
+
+var setPrefix = global.setPrefix = function(prefix_) {
+  prefix = prefix_;
+};
 
 // --------------------------------------------------------------------
 //  Blocks
@@ -155,18 +174,32 @@ global.block = function(/*comment, fn, parent*/) {
   return config;
 };
 
+var writer = function(filename, options_) {
+  var options = options_ || {};
+
+  options.prefix && setPrefix(options.prefix);
+
+  write(0, ['# vim: filetype=nginx:']);
+  _.each(root.g, function(item) {
+    dispatch(item);
+  });
+  write();
+
+  var contents = outputLines.join('\n');
+  if (filename) {
+    return fs.writeFileSync(path.join(prefix, filename), contents, {encoding:'utf8', mode:0o644});
+  }
+
+  /* otherwise -- just send to stdout */
+  process.stdout.write(contents);
+};
 
 // the nginx global
 var nginx = module.exports = function(fn) {
   var config = current = _.extend(root, {g:[], parent: null});
   fn(current);
   return {
-    write: function() {
-      write(0, ['# vim: filetype=nginx:']);
-      _.each(root.g, function(item) {
-        dispatch(item);
-      });
-    }
+    write: writer
   };
 };
 
@@ -285,6 +318,7 @@ global.set_ = function(varName, value, parent) {
 
 global.proxyPass = function(url, parent) {
   return simpleItem('proxy_pass', ['location'], parent, function(level) {
+    write();
     writeln(level, ["proxy_pass", url]);
   });
 };
@@ -303,6 +337,8 @@ global.internalRedirLocation = function(path, fn, parent_) {
     proxyMethod("GET");
     proxyPassRequestBody("off");
     proxyMaxTempFileSize(0);
+
+    blankLine();
 
     fn();
   }, parent_ || current);
@@ -324,6 +360,7 @@ global.tryFiles = function(names, parent_) {
   writeArgs.unshift("try_files");
 
   var item = { fn: function() {
+    write();
     writeln(level, writeArgs);
   }};
   getConfigFrom(['server'], 'server_name', parent).push(item);
@@ -337,6 +374,8 @@ global.proxyPassEx = function(name /*, options, parent*/) {
   var level  = depth(parent);
 
   var item = { fn: function() {
+    write();
+
     if (options.longHeld) {
       writeln(level, ["proxy_connect_timeout", 5000]);
       writeln(level, ["proxy_send_timeout", 5000]);
@@ -411,19 +450,49 @@ var notSoSimpleItem = function(myName, validLocNames, paramNames, params, parent
 global.listen = function(port, params, parent) {
   var names = "default_server,ssl".split(',');
   return notSoSimpleItem('listen', ['server'], names, params || {}, parent, function(level, default_server, ssl) {
+    write();
     writeln(level, ["listen", port, ssl && "ssl", default_server && 'default']);
   });
 };
 
 global.listenSsl = function(port, certPrefix, params, parent) {
-  var names = "default_server".split(',');
-  return notSoSimpleItem('listen_ssl', ['server'], names, params || {}, parent, function(level, default_server) {
+  var names = "default_server,cn".split(',');
+  return notSoSimpleItem('listen_ssl', ['server'], names, params || {}, parent, function(level, default_server, cn_) {
+    var cn        = cn_ || '';
+    var proc;
+    var certFile  = certPrefix+".chained.crt";
+    var keyFile   = certPrefix+".key";
+
     write();
     writeln(level, ["listen", port, "ssl", default_server && 'default']);
-    writeln(level, ["ssl_certificate", certPrefix+".chained.crt"]);
-    writeln(level, ["ssl_certificate_key", certPrefix+".key"]);
+    writeln(level, ["ssl_certificate", certFile]);
+    writeln(level, ["ssl_certificate_key", keyFile]);
     writeln(level, ["ssl_protocols", "TLSv1", "TLSv1.1", "TLSv1.2"]);
     writeln(level, ["ssl_ciphers", "HIGH:!aNULL:!MD5"]);
+
+    // From: http://www.codenes.com/blog/?p=300 (one of the comments)
+    // openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.crt -days 356 -subj "/C=US/ST=California/L=San Diego/O=IT/CN="
+
+    // If the cert does not exist, create a self-signed cert
+    if (!test('-f', certFile)) {
+
+      // Need CN
+      if (!cn) {
+        console.warn('Cert '+certFile+' specified, but not present, and no CN.');
+        return;
+      }
+
+      /* otherwise */
+      var subj = "/C=US/ST=California/L=San Diego/O=IT/CN="+cn;
+
+      mkdir('-p', certPrefix);
+
+      args = ['req', '-nodes', '-x509', '-newkey', 'rsa:4096', '-keyout', keyFile, '-out', certFile, '-days', 365, '-subj', subj];
+      proc = spawnSync('openssl', args);
+      if (proc.error || proc.status !== 0 || proc.signal) {
+        console.error(format("Trying to create self-signed cert: %s -- err: %s, exitCode: %d, signal: %s", certFile, JSON.stringify(proc.error), +proc.status, proc.signal || 'NOSIGNAL'));
+      }
+    }
   });
 };
 
@@ -563,14 +632,49 @@ function dispatch(item) {
   return dispatch(item.fn);
 }
 
+/**
+ *  Does not eliminate zeros or empty strings.
+ */
+function _compact(arr) {
+  return _.chain(arr).map(function(item) {
+    if (item === '')  { return '""'; }
+    return item;
+  }).filter(function(item) {
+    if (item === 0)   { return true; }
+    if (item === '')  { return true; }
+
+    return item;
+  }).value();
+}
+
 function writeln(a, b) {
+  var level = a;
+  var x     = b;
+
+  if (arguments.length === 1) {
+    level = 0;
+    x     = a;
+  }
+
+  var last = x.pop();
+  if (last === '') {
+    last = '""';
+  } else if (_.isUndefined(last)) {
+    last = '';
+  }
+  x.push(last+';');
+
+  return write(level, x);
+}
+
+function write(a, b) {
   var writeOne = function(line) {
-    var i;
+    var i, str = '';
     for (i = 1; i < level; ++i) {
-      process.stdout.write('  ');
+      str += '  ';
     }
-    process.stdout.write(line || "");
-    process.stdout.write(';\n');
+    str += line || '';
+    outputLines.push(str);
   };
 
   var level = a;
@@ -583,50 +687,6 @@ function writeln(a, b) {
 
   if (_.isArray(x)) {
     writeOne(_compact(x).join(' '));
-  } else {
-    writeOne(x);
-  }
-}
-
-/**
- *  Does not eliminate zeros.
- */
-function _compact(arr) {
-  //return _.filter(_.map(arr, function(item) {
-  var result = _.filter(_.map(arr, function(item) {
-    if (item === '')  { return '""'; }
-    return item;
-  }), function(item) {
-    if (item === 0)   { return true; }
-    if (item === '')  { return true; }
-    if (item)         { return true; }
-
-    return false;
-  });
-
-  return result;
-}
-
-function write(a, b) {
-  var writeOne = function(line) {
-    var i;
-    for (i = 1; i < level; ++i) {
-      process.stdout.write('  ');
-    }
-    process.stdout.write(line || "");
-    process.stdout.write('\n');
-  };
-
-  var level = a;
-  var x     = b;
-
-  if (arguments.length === 1) {
-    level = 0;
-    x     = a;
-  }
-
-  if (_.isArray(x)) {
-    writeOne(_.compact(x).join(' '));
   } else {
     writeOne(x);
   }
