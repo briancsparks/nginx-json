@@ -345,6 +345,16 @@ global.internalRedirLocation = function(path, fn, parent_) {
 
 };
 
+global.internalRedirLocationFull = function(path, fn, parent_) {
+
+  locationRei(path, function() {
+    internal();
+
+    fn();
+  }, parent_ || current);
+
+};
+
 
 
 
