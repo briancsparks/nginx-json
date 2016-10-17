@@ -465,13 +465,13 @@ global.listen = function(port, params, parent) {
   });
 };
 
-global.listenSsl = function(port, certPrefix, params, parent) {
+global.listenSsl = function(port, certDir, certPrefix, params, parent) {
   var names = "default_server,cn".split(',');
   return notSoSimpleItem('listen_ssl', ['server'], names, params || {}, parent, function(level, default_server, cn_) {
     var cn        = cn_ || '';
     var proc;
-    var certFile  = certPrefix+".chained.crt";
-    var keyFile   = certPrefix+".key";
+    var certFile  = path.join(certDir, certPrefix+".crt");
+    var keyFile   = path.join(certDir, certPrefix+".key");
 
     write();
     writeln(level, ["listen", port, "ssl", default_server && 'default']);
@@ -495,7 +495,8 @@ global.listenSsl = function(port, certPrefix, params, parent) {
       /* otherwise */
       var subj = "/C=US/ST=California/L=San Diego/O=IT/CN="+cn;
 
-      mkdir('-p', certPrefix);
+      console.error('Generating cert and key for '+certFile);
+      mkdir('-p', certDir);
 
       args = ['req', '-nodes', '-x509', '-newkey', 'rsa:4096', '-keyout', keyFile, '-out', certFile, '-days', 365, '-subj', subj];
       proc = spawnSync('openssl', args);
