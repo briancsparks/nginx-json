@@ -24,28 +24,37 @@ var Nginx = nginx.Nginx = function() {
   self.events = function(fn, parent_) {
     var parent  = parent_ || current;
     var level   = depth(parent);
-    var result  = callAsChild(fn);
+    var result  = callAsChild(fn, {events: []});
 
     var child   = { write: function() {
       write();
       write('events {');
+      _.each(result.events, function(event) {
+        dispatch(event);
+      });
       write('}');
       write();
     }};
-    parent.children.push(child);
+    result.events.push(child);
 
     return result;
   };
 
-  var callAsChild = function(fn) {
-    var temp  = current;
-    current   = {parent: temp, children: []};
+  var callAsChild = function(fn, child) {
+    child.parent  = current;
+    current       = child;
 
-    var res   = current;
-    var user  = fn(self);
+    fn(self, current);
 
-    current   = current.parent;
-    return res;
+    current       = current.parent;
+
+    return child;
+  };
+
+  var dispatch = function(obj) {
+    if (_.isFunction(obj.write)) {
+      obj.write();
+    }
   };
 
   var depth = function(obj) {
