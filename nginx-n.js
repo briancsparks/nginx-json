@@ -1,6 +1,7 @@
 
 var _             = require('underscore');
 var path          = require('path');
+var util          = require('util');
 
 var join          = path.join;
 
@@ -36,15 +37,42 @@ var Nginx = nginx.Nginx = function() {
       write();
     }};
     result.events.push(child);
+    parent.children.push(function() {
+      return child.write();
+    });
 
     return result;
+  };
+
+  self.workerConnections = function(count, parent) {
+    return addChild(parent, function(level) {
+      writeln(level, ["worker_connections", count]);
+    });
+  };
+
+  self.write = function() {
+    console.log(util.inspect(self, {depth:null, colors:true}));
+    _.each(self.data.children, function(child) {
+      console.log(util.inspect(child, {depth:null, colors:true}));
+      child();
+    });
+  };
+
+  var addChild = function(parent, fn) {
+    var level = depth(parent || current);
+
+    var child   = { write: function() {
+      return fn(level);
+    }};
+
+    return child;
   };
 
   var callAsChild = function(fn, child) {
     child.parent  = current;
     current       = child;
 
-    fn(self, current);
+    fn(self);
 
     current       = current.parent;
 
@@ -87,6 +115,24 @@ var Nginx = nginx.Nginx = function() {
 
     str += value;
     output.push(str);
+  };
+
+  var writeln = function(/*indent, value*/) {
+    var args    = _.rest(arguments, 0);
+    var value   = args.pop() || '';
+    var indent  = args.pop() || 0;
+    var str     = '', i;
+
+    for (i = 0; i < indent; ++i) {
+      str += '  ';
+    }
+
+    if (_.isArray(value)) {
+      value = value.join(' ');
+    }
+
+    str += value;
+    output.push(str+';');
   };
 };
 
