@@ -507,6 +507,30 @@ global.listenSsl = function(port, certDir, certPrefix, params, parent) {
   });
 };
 
+// The full monty
+//
+// Create root CA
+// openssl genrsa -des3 -out mariodevca.key 4096
+// openssl req -new -x509 -days 365 -key mariodevca.key -out mariodevca.crt -subj "/C=US/ST=California/L=San Diego/O=IT/CN=YoshiTMunchakoopas"
+//
+// Create server key
+// openssl genrsa -des3 -out server.key 1024
+// openssl req -new -key server.key -out server.csr -subj "/C=US/ST=California/L=San Diego/O=IT/CN=YoshiTMunchakoopas"
+//
+// Signing our own server cert
+// openssl x509 -req -days 365 -in server.csr -CA mariodevca.crt -CAkey mariodevca.key -set_serial 01 -out server.crt
+//
+// Create client key
+// openssl genrsa -des3 -out client.key 1024
+// openssl req -new -key client.key -out client.csr -subj "/C=US/ST=California/L=San Diego/O=IT/CN=YoshiTMunchakoopas"
+//
+// Sign the client cert
+// openssl x509 -req -days 365 -in client.csr -CA mariodevca.crt -CAkey mariodevca.key -set_serial 01 -out client.crt
+//
+// Convert client key to PKCS for browsers
+// openssl pkcs12 -export -clcerts -in client.crt -inkey client.key -out client.p12
+//
+
 global.errorLog = function(name, params, parent) {
   var names = "msgLevel".split(',');
   return notSoSimpleItem('error_log', ['g'], names, params || {}, parent, function(level, msgLevel) {
