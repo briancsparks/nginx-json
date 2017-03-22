@@ -355,12 +355,22 @@ global.internalRedirLocation = function(path, fn, parent_) {
  *  in function.
  */
 var internalRedirLocationFull = global.internalRedirLocationFull = function(path, fn, parent_) {
+  var parent = parent_ || current;
 
   locationRei(path, function() {
     internal();
 
+    blankLine();
+
+    proxySetHeader("X-Real-IP", "$remote_addr");
+    proxySetHeader("X-Forwarded-For", "$proxy_add_x_forwarded_for");
+    proxySetHeader("X-Forwarded-Proto", "$scheme");
+    proxySetHeader("X-NginX-Proxy", true);
+
+    blankLine();
+
     fn();
-  }, parent_ || current);
+  }, parent);
 
 };
 
