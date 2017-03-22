@@ -323,6 +323,10 @@ global.proxyPass = function(url, parent) {
   });
 };
 
+/**
+ *  Creates a location (case-insensitive regex-based) that is intended to be the target
+ *  of a sub-request that uses X-Accel-Redirect.
+ */
 global.internalRedirLocation = function(path, fn, parent_) {
 
   locationRei(path, function() {
@@ -345,7 +349,12 @@ global.internalRedirLocation = function(path, fn, parent_) {
 
 };
 
-global.internalRedirLocationFull = function(path, fn, parent_) {
+/**
+ *  Creates a location (case-insensitive regex-based) that is intended to be the target
+ *  of a sub-request that uses X-Accel-Redirect. Provides *full* capabilities to the passed-
+ *  in function.
+ */
+var internalRedirLocationFull = global.internalRedirLocationFull = function(path, fn, parent_) {
 
   locationRei(path, function() {
     internal();
@@ -355,6 +364,27 @@ global.internalRedirLocationFull = function(path, fn, parent_) {
 
 };
 
+var internalBalance = global.internalBalance = function(method, fn_, parent_) {
+  var fn = fn_ || function(){};
+
+  internalRedirLocationFull(method, "^/secret_internal_fullbalanceto/([^/]*)/"+method+"/(.*)", function() {
+
+    proxyMethod(method);
+
+    set_("$download_host", "$1");
+    set_("$download_path", "$2");
+
+    fn();
+
+    proxyPass("http://$download_host/$download_path");
+  }, parent_ || current);
+};
+
+global.internalBalanceAll = function(fn, parent) {
+  _.each("GET,PUT,POST,DELETE".split(","), function(method) {
+    internalBalance(method, fn, parent);
+  });
+};
 
 
 
