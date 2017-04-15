@@ -377,7 +377,7 @@ var internalRedirLocationFull = global.internalRedirLocationFull = function(path
 var internalBalance = global.internalBalance = function(method, fn_, parent_) {
   var fn = fn_ || function(){};
 
-  internalRedirLocationFull(method, "^/internal_fullbalanceto/"+method+"/([^/]*)/(.*)", function() {
+  internalRedirLocationFull("^/internal_fullbalanceto/"+method+"/([^/]*)/(.*)", function() {
 
     proxyMethod(method);
 
@@ -393,7 +393,7 @@ var internalBalance = global.internalBalance = function(method, fn_, parent_) {
 var internalInstrumentedBalance = global.internalInstrumentedBalance = function(method, fn_, parent_) {
   var fn = fn_ || function(){};
 
-  internalRedirLocationFull(method, "^/internal_instbalanceto/"+method+"/([^/]*)/([^/]*)/(.*)", function() {
+  internalRedirLocationFull("^/internal_instbalanceto/"+method+"/([^/]*)/([^/]*)/(.*)", function() {
 
     proxyMethod(method);
 
