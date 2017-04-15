@@ -377,7 +377,7 @@ var internalRedirLocationFull = global.internalRedirLocationFull = function(path
 var internalBalance = global.internalBalance = function(method, fn_, parent_) {
   var fn = fn_ || function(){};
 
-  internalRedirLocationFull(method, "^/secret_internal_fullbalanceto/([^/]*)/"+method+"/(.*)", function() {
+  internalRedirLocationFull(method, "^/internal_fullbalanceto/"+method+"/([^/]*)/(.*)", function() {
 
     proxyMethod(method);
 
@@ -390,9 +390,28 @@ var internalBalance = global.internalBalance = function(method, fn_, parent_) {
   }, parent_ || current);
 };
 
+var internalInstrumentedBalance = global.internalInstrumentedBalance = function(method, fn_, parent_) {
+  var fn = fn_ || function(){};
+
+  internalRedirLocationFull(method, "^/internal_instbalanceto/"+method+"/([^/]*)/([^/]*)/(.*)", function() {
+
+    proxyMethod(method);
+
+    proxySetHeader("X-Amzn-Trace-Id", "Root=$1; Sampled=1");
+
+    set_("$download_host", "$2");
+    set_("$download_path", "$3");
+
+    fn();
+
+    proxyPass("http://$download_host/$download_path");
+  }, parent_ || current);
+};
+
 global.internalBalanceAll = function(fn, parent) {
-  _.each("GET,PUT,POST,DELETE".split(","), function(method) {
+  _.each("GET,PUT,POST,DELETE,HEAD".split(","), function(method) {
     internalBalance(method, fn, parent);
+    internalInstrumentedBalance(method, fn, parent);
   });
 };
 
