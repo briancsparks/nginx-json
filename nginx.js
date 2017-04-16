@@ -393,14 +393,29 @@ var internalBalance = global.internalBalance = function(method, fn_, parent_) {
 var internalInstrumentedBalance = global.internalInstrumentedBalance = function(method, fn_, parent_) {
   var fn = fn_ || function(){};
 
-  internalRedirLocationFull("^/internal_instbalanceto/"+method+"/([^/]*)/([^/]*)/(.*)", function() {
+  // /.../POST/root/sampled/host/path
+  internalRedirLocationFull("^/internal_xraybalanceto/"+method+"/([^/]*)/(.)/([^/]*)/(.*)", function() {
+    proxySetHeader("X-Amzn-Trace-Id", "Root=$1; Sampled=$2");
 
     proxyMethod(method);
 
-    proxySetHeader("X-Amzn-Trace-Id", "Root=$1; Sampled=1");
+    set_("$download_host", "$3");
+    set_("$download_path", "$4");
 
-    set_("$download_host", "$2");
-    set_("$download_path", "$3");
+    fn();
+
+    proxyPass("http://$download_host/$download_path");
+  }, parent_ || current);
+
+  // With a Parent
+  // /.../POST/root/parent/sampled/host/path
+  internalRedirLocationFull("^/internal_xraybalanceto/"+method+"/([^/]*)/([^/]*)/(.)/([^/]*)/(.*)", function() {
+    proxySetHeader("X-Amzn-Trace-Id", "Root=$1; Parent=$2; Sampled=$3");
+
+    proxyMethod(method);
+
+    set_("$download_host", "$4");
+    set_("$download_path", "$5");
 
     fn();
 
