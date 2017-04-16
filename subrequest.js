@@ -78,6 +78,7 @@ lib.instrumentedBalanceTo = function(req, res, path, options_) {
   var root            = options.root;
   var parent          = options.parent;
   var sampled         = options.sampled;
+  var msg             = options.msg;
 
   if (options.service) {
     ip    = urlLib.parse(options.service).hostname;
