@@ -279,9 +279,9 @@ var simpleItem = function(myName, validLocNames, parent_, fn) {
 };
 
 // For a map
-global.item = function(name, value, parent) {
+global.mapItem = function(name, value, parent) {
   return simpleItem('map_item', ['map'], parent, function(level) {
-    writeln(level, ["item", name, value]);
+    writeln(level, [name, value]);
   });
 };
 
@@ -385,6 +385,13 @@ global.proxyPass = function(url, parent) {
   return simpleItem('proxy_pass', ['location'], parent, function(level) {
     write();
     writeln(level, ["proxy_pass", url]);
+  });
+};
+
+global.sslClientCertificate = function(certFilename, onOrOff, parent) {
+  return simpleItem('ssl_client_certificate', ['server'], parent, function(level) {
+    writeln(level, ["ssl_client_certificate", certFilename]);
+    writeln(level, ["ssl_verify_client", onOrOff]);
   });
 };
 
