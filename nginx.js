@@ -84,6 +84,25 @@ global.server = function(fn, parent_) {
   return config;
 };
 
+global.map = function(a, b, fn, parent_) {
+  var parent = parent_ || current;
+
+  var level  = depth(parent);
+  var config = config_fn({map:[]}, fn);
+
+  var item = { fn: function() {
+    write();
+    write(level, ['map', a, b, "{"].join(' '));
+    _.each(config.map, function(item) {
+      dispatch(item);
+    });
+    write(level, "}");
+  }};
+  getConfigFrom(['http', 'location'], 'server', parent).push(item);
+
+  return config;
+};
+
 global.location = function(path, options_, fn, parent_) {
   var parent  = parent_   || current;
   var options = options_  || {};
@@ -150,6 +169,33 @@ global.upstream = function(name, fn, parent_) {
   return config;
 };
 
+global.namedBlock = function(type_, name, fn /* comment, parent */) {
+  var args      = _.rest(arguments, 3);
+  var type      = type_ || 'xyz';
+  var comment   = _.isString(args[0]) ? args.shift() : null;
+  var parent    = args.length > 0 ? args.shift() : current;
+
+  var level  = depth(parent);
+  var config = config_fn(sg.kv(type, []), fn);
+
+  var item = { fn: function() {
+    write();
+    if (comment) {
+      write(level, "# "+comment);
+    }
+
+    var header = _.compact([type_, name]).join(' ');
+    write(level, header+" {");
+    _.each(config[type], function(item) {
+      dispatch(item);
+    });
+    write(level, "}");
+  }};
+  getConfigFrom([], 'block', parent).push(item);
+
+  return config;
+};
+
 global.block = function(/*comment, fn, parent*/) {
   var args      = _.toArray(arguments);
   var comment   = _.isString(args[0]) ? args.shift() : null;
@@ -208,6 +254,18 @@ var nginx = module.exports = function(fn) {
 //  Simple Items
 // --------------------------------------------------------------------
 
+var ngxValue = function(value) {
+  if (_.isString(value)) {
+    if (value.length === 0) {
+      return '""';
+    } else if (value[0] !== '$') {
+      return '"'+value+'"';
+    }
+  }
+
+  return value;
+};
+
 var simpleItem = function(myName, validLocNames, parent_, fn) {
   var parent = parent_ || current;
   var level  = depth(parent);
@@ -218,6 +276,13 @@ var simpleItem = function(myName, validLocNames, parent_, fn) {
   getConfigFrom(validLocNames, myName, parent).push(item);
 
   return item;
+};
+
+// For a map
+global.item = function(name, value, parent) {
+  return simpleItem('map_item', ['map'], parent, function(level) {
+    writeln(level, ["item", name, value]);
+  });
 };
 
 global.singleLine = function(elts, parent) {
@@ -234,7 +299,7 @@ global.workerConnections = function(count, parent) {
 
 global.user = function(name, parent) {
   return simpleItem('user', ['g'], parent, function(level) {
-    writeln(level, ["user", name]);
+    writeln(level, ["user", ngxValue(name)]);
   });
 };
 
@@ -288,7 +353,7 @@ global.proxyBuffering = function(onOrOff, parent) {
 
 global.proxySetHeader = function(headerName, value, parent) {
   return simpleItem('proxy_set_header', ['location'], parent, function(level) {
-    writeln(level, ["proxy_set_header", headerName, '"'+value+'"']);
+    writeln(level, ["proxy_set_header", headerName, ngxValue(value)]);
   });
 };
 
@@ -312,7 +377,7 @@ global.proxyMaxTempFileSize = function(size, parent) {
 
 global.set_ = function(varName, value, parent) {
   return simpleItem('set', [], parent, function(level) {
-    writeln(level, ["set", varName, '"'+value+'"']);
+    writeln(level, ["set", varName, ngxValue(value)]);
   });
 };
 
@@ -701,7 +766,7 @@ function getConfigFrom(names, ctxName, obj_, options_) {
 
   if (!context) {
     console.error("current:", current);
-    die(ctxName+" is not in right block, should be: "+names.join(', or'));
+    die(ctxName+" is not in right block, should be: "+names.join(', or '));
     return;
   }
 }
