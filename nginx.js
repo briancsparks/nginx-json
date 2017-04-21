@@ -607,7 +607,7 @@ global.listen = function(port, params, parent) {
   var names = "default_server,ssl".split(',');
   return notSoSimpleItem('listen', ['server'], names, params || {}, parent, function(level, default_server, ssl) {
     write();
-    writeln(level, ["listen", port, ssl && "ssl", default_server && 'default']);
+    writeln(level, _.compact(["listen", port, ssl && "ssl", default_server && 'default']));
   });
 };
 
