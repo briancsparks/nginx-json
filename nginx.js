@@ -389,7 +389,7 @@ global.proxyPass = function(url, parent) {
 };
 
 global.sslClientCertificate = function(certFilename, onOrOff, parent) {
-  return simpleItem('ssl_client_certificate', ['server'], parent, function(level) {
+  return simpleItem('ssl_client_certificate', ['block', 'server'], parent, function(level) {
     writeln(level, ["ssl_client_certificate", certFilename]);
     writeln(level, ["ssl_verify_client", onOrOff]);
   });
@@ -576,7 +576,6 @@ global.blankLine = function(parent) {
 };
 
 global.append = function(config, parameter /*, args*/) {
-
   var args = _.rest(arguments, 2);
 
   args.push(config);
