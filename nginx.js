@@ -408,7 +408,7 @@ global.set_ = function(varName, value, parent) {
 global.proxyPass = function(url, parent) {
   return simpleItem('proxy_pass', ['location'], parent, function(level) {
     write();
-    writeln(level, ["proxy_pass", url]);
+    writeln(level, ["proxy_pass", url+'$is_args$args']);
   });
 };
 
