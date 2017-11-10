@@ -375,6 +375,30 @@ global.proxyMaxTempFileSize = function(size, parent) {
   });
 };
 
+global.proxyConnectTimeout = function(timeout, parent) {
+  return simpleItem('proxy_connect_timeout', ['location'], parent, function(level) {
+    writeln(level, ["proxy_connect_timeout", +timeout]);
+  });
+};
+
+global.proxySendTimeout = function(timeout, parent) {
+  return simpleItem('proxy_send_timeout', ['location'], parent, function(level) {
+    writeln(level, ["proxy_send_timeout", timeout]);
+  });
+};
+
+global.proxyReadTimeout = function(timeout, parent) {
+  return simpleItem('proxy_read_timeout"', ['location'], parent, function(level) {
+    writeln(level, ["proxy_read_timeout", timeout]);
+  });
+};
+
+global.sendTimeout = function(timeout, parent) {
+  return simpleItem('send_timeout', ['location'], parent, function(level) {
+    writeln(level, ["send_timeout", timeout]);
+  });
+};
+
 global.set_ = function(varName, value, parent) {
   return simpleItem('set', [], parent, function(level) {
     writeln(level, ["set", varName, ngxValue(value)]);
@@ -416,6 +440,13 @@ global.internalRedirLocation = function(path, fn, parent_) {
 
     blankLine();
 
+    proxyConnectTimeout(5000);
+    proxySendTimeout(5000);
+    proxyReadTimeout(5000);
+    sendTimeout(5000);
+
+    blankLine();
+
     fn();
   }, parent_ || current);
 
@@ -438,6 +469,13 @@ var internalRedirLocationFull = global.internalRedirLocationFull = function(path
     proxySetHeader("X-Forwarded-For", "$proxy_add_x_forwarded_for");
     proxySetHeader("X-Forwarded-Proto", "$scheme");
     proxySetHeader("X-NginX-Proxy", true);
+
+    blankLine();
+
+    proxyConnectTimeout(5000);
+    proxySendTimeout(5000);
+    proxyReadTimeout(5000);
+    sendTimeout(5000);
 
     blankLine();
 
